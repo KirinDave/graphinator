@@ -3,8 +3,10 @@
 
 ; Data primitives 
 (define-struct commit (name parents date author title marked?))
-(define (root? x) (null? (commit-parents x)))
-(define (mark! x) (set-commit-marked?! x))
+(define (commit-root? x) (null? (commit-parents x)))
+(define (commit-mark! x) (set-commit-marked?! x #t))
+
+(define orphaned-commit (make-commit 'bad '() 0 "noone!" "failboat" #f))
 
 ; Lame-ass parser
 (define commit-from-form
@@ -54,13 +56,43 @@
                                    item)
                   (set! cls (cons item cls))))
              (loop-dirs (cdr dirs)))))))
-               
-                 
-                 
-                 
-      
+
+(define (make-graph-major-ordered commits entity-table)
+  (letrec ([fand (lambda (x y) (and x y))] ; Annoying
+           [parents (lambda (commit)
+                      (map (lambda (x) 
+                             (hash-table-get entity-table
+                                             x
+                                             orphaned-commit))
+                           (commit-parents commit)))]
+                    [parents-marked? 
+            (lambda (commit)
+              (foldl fand #t 
+                     (map commit-marked? (parents commit))))]
+           [eligable? (lambda (x) 
+                        (and (not (commit-marked? x))
+                             (parents-marked? x)))]
+           [find-eligable 
+            (lambda (cls)
+              (cond ((null? cls) #f)
+                    ((eligable? (car cls)) (car cls))
+                    (else (find-eligable (cdr cls)))))])
+    (display "Looping starts now.")
+    (let loop ((cls commits) (output (list)))
+      (cond ((null? cls) (display "Top null bailout\n") (reverse output))
+            ((commit-marked? (car cls)) (loop (cdr cls) output))
+            (else 
+             (let ((n (find-eligable cls)))
+              (cond 
+               (n (commit-mark! n)
+                  (loop cls (cons n output)))
+               (else
+                (display "base-level bailout\n")
+                (reverse output))))))))) ; No more valid commits.
     
 
 (provide process-git-commits)
 (provide accumulate-commits)
+(provide make-graph-major-ordered)
+(provide commit-name commit-parents commit-marked?)
 ) ; end module
