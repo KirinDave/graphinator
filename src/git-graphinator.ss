@@ -1,7 +1,6 @@
 (module git-graphinator mzscheme
   (require "pragmatic.ss")
 
-
 ; Data primitives 
 (define-struct commit (name parents date author title marked?))
 (define (root? x) (null? (commit-parents x)))
