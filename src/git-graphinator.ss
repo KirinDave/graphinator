@@ -5,8 +5,28 @@
 (define-struct commit (name parents date author title marked?))
 (define (commit-root? x) (null? (commit-parents x)))
 (define (commit-mark! x) (set-commit-marked?! x #t))
-
 (define orphaned-commit (make-commit 'bad '() 0 "noone!" "failboat" #f))
+
+(define (write-json-commit commit out) (display (commit->json commit) out))
+(define (commit->json commit)
+  (let* ([sy->st (lambda (x) (format "~s" (symbol->string x)))]
+         [format-parents 
+          (lambda (parents)
+            (cond ((null? parents) "")
+                  (else (string-join "," (map sy->st parents)))))])
+    (format 
+     (string-append "{"
+                    "\"id\":\"~a\","
+                    "\"author\":\"~a\","
+                    "\"date\":\"~a\","
+                    "\"parents\":[~a],"
+                    "\"message\":~s"
+                    "}")
+     (commit-name commit)
+     (commit-author commit)
+     (commit-date commit)
+     (format-parents (commit-parents commit))
+     (commit-title commit))))
 
 ; Lame-ass parser
 (define commit-from-form
@@ -95,4 +115,7 @@
 (provide accumulate-commits)
 (provide make-graph-major-ordered)
 (provide commit-name commit-parents commit-marked?)
+(provide commit->json)
+
+
 ) ; end module
