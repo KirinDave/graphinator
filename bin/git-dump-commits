@@ -1,0 +1,9 @@
+#! /bin/sh
+#|
+exec mzscheme -qu "$0" ${1+"$@"}
+|#
+
+(module git-dump-commits mzscheme
+        (require "../lib/git-graphinator.zo")    
+        
+(output-for-dirs (vector->list (current-command-line-arguments))))

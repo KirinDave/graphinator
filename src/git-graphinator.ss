@@ -44,7 +44,7 @@
 
 ; Fetching from git
 (define git-command-strings
-  '("git --no-pager " "' log --date=rfc --reverse --pretty='format:(%H (%P) %at \"%ae\") !split!%t'"))
+  '("git --no-pager " "' log --date=rfc --reverse --pretty='format:(%H (%P) %at \"%ae\") !split!%s'"))
 
 (define (git-cmd dir)
   (let [(base (first git-command-strings))
@@ -67,7 +67,7 @@
 ; While doing so, keep a buffer head commits
 ; return a list of head commits and a hash of all commits
 
-(define (accumulate-commits . directories)
+(define (accumulate-commits directories)
   (let ([chs (make-hash-table)]
         [cls (list)]
         [sort 
@@ -117,22 +117,17 @@
                 (reverse output))))))))) ; No more valid commits.
 
 (define (write-commits commits)
-  (display "{\"commits\":[")
   (let l ((cs commits) (comma #f))
     (cond ((null? cs) (values))
           (else (if comma (display ","))
                 (write-json-commit (car cs) 
                                    (current-output-port))
-                (l (cdr cs) #t))))
-  (display "]}"))
-    
+                (l (cdr cs) #t)))))
 
-(provide process-git-commits)
-(provide accumulate-commits)
-(provide make-graph-major-ordered)
-(provide commit-name commit-parents commit-marked?)
-(provide commit->json)
-(provide write-commits)
+(define (output-for-dirs dirs)
+  (match-let ([(commits dict) (accumulate-commits dirs)])
+             (write-commits (make-graph-major-ordered commits dict))))
+             ;(write-commits commits)))
 
-
+(provide output-for-dirs)
 ) ; end module
