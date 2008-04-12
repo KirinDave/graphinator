@@ -1,5 +1,13 @@
 (module git-graphinator mzscheme
-  (require "pragmatic.ss")
+        (require (lib "list.ss")
+                 (lib "process.ss")
+                 (lib "match.ss")
+                 (lib "string.ss"))
+
+; Utility
+(define (string-join joiner strings)
+  (foldl (lambda (x y) (string-append y joiner x)) (car strings)
+         (cdr strings)))
 
 ; Data primitives 
 (define-struct commit (name parents date author title marked?))
@@ -28,15 +36,15 @@
      (format-parents (commit-parents commit))
      (commit-title commit))))
 
-; Lame-ass parser
-(define commit-from-form
-  (match-lambda 
-   [(n p d a t)    (make-commit n p d a t #f)]
-   [(n p d a . ig) (make-commit n p d a "(malformatted title)" #f)]))
+
+(define (commit-from-line line)
+  (let ((parts (regexp-split "!split!" line)))
+    (match-let ([(n p d a) (read-from-string (first parts))])
+               (make-commit n p d a (second parts) #f))))
 
 ; Fetching from git
 (define git-command-strings
-  '("git --no-pager " "' log --date=rfc --reverse --pretty='format:(%H (%P) %at \"%ae\" \"%t\")'"))
+  '("git --no-pager " "' log --date=rfc --reverse --pretty='format:(%H (%P) %at \"%ae\") !split!%t'"))
 
 (define (git-cmd dir)
   (let [(base (first git-command-strings))
@@ -44,14 +52,14 @@
     (string-append base "--git-dir=\'" dir tail)))
 
 (define (process-git-commits dir handler)
-  (let/m ([(in out id err control) (process (git-cmd dir))])
+  (match-let ([(in out id err control) (process (git-cmd dir))])
     (close-output-port out) (close-input-port err)
-    (let loop ((next (read in)))
+    (let loop ((next (read-line in)))
       (cond
        ((eof-object? next) 'done)
        (else
-        (handler (commit-from-form next))
-        (loop (read in)))))
+        (handler (commit-from-line next))
+        (loop (read-line in)))))
     (close-input-port in)))
 
 ; Reading step
@@ -97,9 +105,8 @@
               (cond ((null? cls) #f)
                     ((eligable? (car cls)) (car cls))
                     (else (find-eligable (cdr cls)))))])
-    (display "Looping starts now.")
     (let loop ((cls commits) (output (list)))
-      (cond ((null? cls) (display "Top null bailout\n") (reverse output))
+      (cond ((null? cls) (reverse output))
             ((commit-marked? (car cls)) (loop (cdr cls) output))
             (else 
              (let ((n (find-eligable cls)))
@@ -107,8 +114,17 @@
                (n (commit-mark! n)
                   (loop cls (cons n output)))
                (else
-                (display "base-level bailout\n")
                 (reverse output))))))))) ; No more valid commits.
+
+(define (write-commits commits)
+  (display "{\"commits\":[")
+  (let l ((cs commits) (comma #f))
+    (cond ((null? cs) (values))
+          (else (if comma (display ","))
+                (write-json-commit (car cs) 
+                                   (current-output-port))
+                (l (cdr cs) #t))))
+  (display "]}"))
     
 
 (provide process-git-commits)
@@ -116,6 +132,7 @@
 (provide make-graph-major-ordered)
 (provide commit-name commit-parents commit-marked?)
 (provide commit->json)
+(provide write-commits)
 
 
 ) ; end module

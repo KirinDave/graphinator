@@ -20,7 +20,10 @@
 (define (string-join joiner strings)
   (foldl (lambda (x y) (string-append y joiner x)) (car strings)
          (cdr strings)))
-    
+
+(define (each f x)
+  (cond ((null? x) (values))
+        (else (f (car x)) (each f (cdr x)))))
     
 (provide string-join)
 (provide rename-syntax let/m lambda/m)
