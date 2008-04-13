@@ -2,7 +2,8 @@
         (require (lib "list.ss")
                  (lib "process.ss")
                  (lib "match.ss")
-                 (lib "string.ss"))
+                 (lib "string.ss")
+                 (lib "pregexp.ss"))
 
 ; Utility
 (define (string-join joiner strings)
@@ -37,14 +38,30 @@
      (commit-title commit))))
 
 
+(define rsplit (pregexp "!split!"))
 (define (commit-from-line line)
-  (let ((parts (regexp-split "!split!" line)))
-    (match-let ([(n p d a) (read-from-string (first parts))])
+  (let ((parts (pregexp-split rsplit line)))
+    (match-let ([(n p d a) (lex-left-side (first parts))])
                (make-commit n p d a (second parts) #f))))
+
+(define lex-left-side
+  (let ((rx (pregexp "!-!"))
+        (sx (pregexp " ")))
+    (lambda (ls)
+      (let ([items (pregexp-split rx ls)]
+            [mpar (lambda (ps)
+                    (if (> (string-length ps) 0)
+                        (map string->symbol (pregexp-split sx ps))
+                        (list)))])
+        (list 
+         (string->symbol (first items))
+         (mpar (second items))
+         (string->number (third items))
+         (fourth items))))))
 
 ; Fetching from git
 (define git-command-strings
-  '("git --no-pager " "' log --date=rfc --reverse --pretty='format:(%H (%P) %at \"%ae\") !split!%s'"))
+  '("git --no-pager " "' log --reverse --date=rfc --pretty='format:%H!-!%P!-!%at!-!%ae!split!%s'"))
 
 (define (git-cmd dir)
   (let [(base (first git-command-strings))
@@ -129,5 +146,6 @@
              (write-commits (make-graph-major-ordered commits dict))))
              ;(write-commits commits)))
 
+(provide accumulate-commits write-commits make-graph-major-ordered commit->json)
 (provide output-for-dirs)
 ) ; end module
